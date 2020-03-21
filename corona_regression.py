@@ -1,24 +1,23 @@
+import os
 import urllib.request
 from datetime import datetime, timedelta
-import os
-import click
 
-import matplotlib.pyplot as plt
+import click
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sklearn.linear_model
-from pandas import to_datetime as dt
-
 import slack
+from pandas import to_datetime as dt
 
 
 def date2int(X):
-    return X.values.reshape((-1, 1)).astype(int)
+    return np.array([datetime.toordinal(x) for x in X]).reshape((-1, 1))
 
 
 def coef2factor(coef):
-    return np.exp(coef * timedelta(days=1).total_seconds() * 1e9)
+    return np.exp(coef)
 
 
 def download_and_read_data(country):
