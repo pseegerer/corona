@@ -55,12 +55,13 @@ def compute_confidence_intervals(y_pred, X_pred, df_ger, confidence=95):
 
 @click.command()
 @click.option("--country", default="Germany")
-@click.option("--start_date", default="2020-03-01", help="Date when to start the regression.")
-@click.option("--look_ahead", default=10, type=int, help="How many days to look into the future from today on.")
+@click.option("--start_date", default="2020-03-14",
+              help="Date when to start the regression.")
+@click.option("--look_ahead", default=10, type=int,
+              help="How many days to look into the future from today on.")
 @click.option("--post", is_flag=True, help="Whether to post it to Slack.")
 def main(country, start_date, look_ahead, post):
     # Parameters
-    inhabitants_germany = 83019213
     confidence = 95
     look_ahead = look_ahead * timedelta(days=1)
 
@@ -77,9 +78,13 @@ def main(country, start_date, look_ahead, post):
     linreg = sklearn.linear_model.LinearRegression()
     linreg.fit(X_int, y_log)
     r2 = linreg.score(X_int, y_log)
-    print(f"Fitted linear regression with R^2={r2:.3f}")
+    message += f"Fitted linear regression with R^2={r2:.3f}\n"
 
     factor = coef2factor(linreg.coef_[0, 0])
+    message += f"Increase factor per day: {factor:.3f}\n"
+
+    # In how many days does the number double?
+    message += f"Number doubles every {np.log(2) / np.log(factor):.1f} days, multiplies by 10 every {np.log(10) / np.log(factor):.1f}.\n"
 
     # Predict
     X_pred = pd.date_range(start_date, end=datetime.today() + look_ahead,
@@ -93,6 +98,9 @@ def main(country, start_date, look_ahead, post):
     # Print
     fstr = "%a %d, %b"
     message += "```\n"
+    message += "           Predict.      Diff.   Measur.    Diff.\n"
+    message += "------------------------------------------------\n"
+    y_prev = np.nan
     for day_curr, y, l, u in zip(X_pred, y_pred[:, 0], lower, upper):
         if day_curr.weekday() == 0:
             message += "\n"
@@ -100,7 +108,20 @@ def main(country, start_date, look_ahead, post):
             measurement = df.loc[day_curr.date()].values[0]
         except KeyError:
             measurement = np.nan
-        message += f"{day_curr.to_pydatetime().strftime(fstr)} {y:7.0f} ({100 * y / inhabitants_germany:.2f}%) {measurement:7.0f}\n"
+
+        # Difference to day before
+        try:
+            diff_measurement = measurement - df.loc[
+                day_curr.date() - timedelta(days=1)].values[0]
+        except KeyError:
+            diff_measurement = np.nan
+
+        diff_y = y - y_prev
+        y_prev = y
+
+        message += f"{day_curr.to_pydatetime().strftime(fstr)} {y:7.0f} ({diff_y:7.0f}+) {measurement:7.0f} ({diff_measurement:7.0f}+)"
+
+        message += "\n"
     message += "```"
 
     # Plot
