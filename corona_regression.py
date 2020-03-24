@@ -20,9 +20,9 @@ def coef2factor(coef):
     return np.exp(coef)
 
 
-def download_and_read_data(country):
+def download_and_read_data(country, deaths=False):
     # Download data
-    url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
+    url = f"https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{'deaths' if deaths else 'confirmed'}_global.csv"
     df_file = "data.csv"
     urllib.request.urlretrieve(url, filename=df_file)
 
@@ -60,12 +60,14 @@ def compute_confidence_intervals(y_pred, X_pred, df_ger, confidence=95):
 @click.option("--look_ahead", default=10, type=int,
               help="How many days to look into the future from today on.")
 @click.option("--post", is_flag=True, help="Whether to post it to Slack.")
-def main(country, start_date, look_ahead, post):
+@click.option("--deaths", is_flag=True,
+              help="If true, show deaths instead of infected.")
+def main(country, start_date, look_ahead, post, deaths):
     # Parameters
     confidence = 95
     look_ahead = look_ahead * timedelta(days=1)
 
-    df = download_and_read_data(country)
+    df = download_and_read_data(country, deaths=deaths)
     message = ""
     message += f"Latest measurement from `{df.index[-1]}`\n"
 
@@ -136,6 +138,7 @@ def main(country, start_date, look_ahead, post):
                     label="Today")
         plt.xlim([dt(start_date), X_pred[-1]])
         plt.ylim([y_pred[0], y_pred[-1]])
+        plt.ylabel("Deaths" if deaths else "Cases")
         plt.gca().xaxis.set_minor_locator(mdates.DayLocator())
         plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
         if log:
